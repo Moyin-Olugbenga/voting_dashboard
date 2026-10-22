@@ -2,22 +2,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Plus, CheckCircle, AlertCircle, Fingerprint, Calendar, X } from 'lucide-react';
+import { Users, Plus, CheckCircle, AlertCircle, Fingerprint, X } from 'lucide-react';
 import api from '@/app/lib/api';
+
 export default function VotersListPage() {
   const [voters, setVoters] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [voterId, setVoterId] = useState('');
   const [name, setName] = useState('');
   const [fingerprintId, setFingerprintId] = useState('');
+  const [deviceId, setDeviceId] = useState('device-esp32-01'); // Default to first terminal
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const fetchVoters = async () => {
     try {
-      // Adjust endpoint if your backend route differs (e.g. /admin/voters)
-      const res = await api.get('/admin/voters');
+      const res = await api.get('/voters'); // Matches backend @Controller('voters')
       if (res.data) {
         setVoters(res.data.voters || res.data);
       }
@@ -42,6 +43,7 @@ export default function VotersListPage() {
         voterId,
         name,
         fingerprintId: parseInt(fingerprintId, 10),
+        deviceId,
       });
 
       if (res.data.success || res.status === 201) {
@@ -63,7 +65,7 @@ export default function VotersListPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Voters Management</h1>
-          <p className="text-sm text-gray-400 mt-1">Register eligible voters, assign fingerprint biometric IDs, and track participation.</p>
+          <p className="text-sm text-gray-400 mt-1">Register eligible voters, assign fingerprint biometric IDs, and map hardware terminals.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -130,7 +132,21 @@ export default function VotersListPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Fingerprint Template ID</label>
+                <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Hardware Terminal Assignment</label>
+                <select
+                  value={deviceId}
+                  onChange={(e) => setDeviceId(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="device-esp32-01">Main Hall Voting Terminal (device-esp32-01)</option>
+                  <option value="device-esp32-02">Engineering Lecture Theater Terminal (device-esp32-02)</option>
+                  <option value="device-esp32-03">Student Center Terminal (device-esp32-03)</option>
+                  <option value="device-esp32-04">Senate Building Terminal (device-esp32-04)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Fingerprint Template ID Slot</label>
                 <input
                   type="number"
                   value={fingerprintId}
@@ -161,7 +177,7 @@ export default function VotersListPage() {
         </div>
       )}
 
-      {/* Voters List Table / Grid */}
+      {/* Voters List Table */}
       <div className="bg-gray-800 border border-gray-700/60 rounded-xl overflow-hidden">
         <div className="p-6 border-b border-gray-700 flex items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center space-x-2">
@@ -180,6 +196,7 @@ export default function VotersListPage() {
                 <tr>
                   <th className="px-6 py-3">Voter ID</th>
                   <th className="px-6 py-3">Name</th>
+                  <th className="px-6 py-3">Terminal ID</th>
                   <th className="px-6 py-3">Fingerprint Slot</th>
                   <th className="px-6 py-3">Registered Date</th>
                 </tr>
@@ -187,8 +204,9 @@ export default function VotersListPage() {
               <tbody className="divide-y divide-gray-700/50">
                 {voters.map((voter) => (
                   <tr key={voter.id || voter.voterId} className="hover:bg-gray-700/20">
-                    <td className="px-6 py-4 font-mono text-indigo-300">{voter.voterId}</td>
+                    <td className="px-6 py-4 font-mono text-indigo-300">{voter.id || voter.voterId}</td>
                     <td className="px-6 py-4 font-medium">{voter.name}</td>
+                    <td className="px-6 py-4 font-mono text-gray-300 text-xs">{voter.deviceId}</td>
                     <td className="px-6 py-4 font-mono text-gray-300 flex items-center space-x-1">
                       <Fingerprint className="w-4 h-4 text-indigo-400" />
                       <span>#{voter.fingerprintId}</span>
@@ -200,7 +218,7 @@ export default function VotersListPage() {
                 ))}
                 {voters.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500 italic">
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
                       No voters registered yet. Click "Register Voter" above to add one.
                     </td>
                   </tr>
