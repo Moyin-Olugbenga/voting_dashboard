@@ -19,7 +19,7 @@ export default function ElectionsListPage() {
 
   const fetchElections = async () => {
     try {
-      const res = await api.get('/admin/dashboard/overview');
+      const res = await api.get('/elections');
       // If you store elections in your overview or a dedicated /elections endpoint, map them here:
       if (res.data && res.data.elections) {
         setElections(res.data.elections);
