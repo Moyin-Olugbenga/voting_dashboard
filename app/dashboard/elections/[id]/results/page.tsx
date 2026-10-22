@@ -3,7 +3,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { BarChart2, ShieldCheck, Clock, Award, Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Trophy, ShieldCheck, Clock, Award, Lock, CheckCircle, AlertCircle, Users, BarChart3 } from 'lucide-react';
 import api from '@/app/lib/api';
 
 function ElectionResultsContent() {
@@ -17,11 +17,11 @@ function ElectionResultsContent() {
   const fetchResultsAndBallots = async () => {
     try {
       const [resResults, resBallots] = await Promise.all([
-        api.get(`/admin/dashboard/elections/${id}/results`),
-        api.get(`/admin/dashboard/elections/${id}/ballots`),
+        api.get(`/elections/${id}/results`),
+        api.get(`/elections/${id}/ballots`),
       ]);
       setData(resResults.data);
-      setBallots(resResults.data.ballots);
+      setBallots(resBallots.data.ballots || []);
     } catch (err) {
       console.error('Failed to load election results', err);
     } finally {
@@ -68,7 +68,9 @@ function ElectionResultsContent() {
               {data?.status}
             </span>
           </div>
-          <p className="text-sm text-gray-400">Total Votes Cast: <span className="text-indigo-400 font-bold">{data?.totalVotes}</span></p>
+          <p className="text-sm text-gray-400">
+            Total Votes Cast: <span className="text-indigo-400 font-bold">{data?.totalVotes}</span> / {data?.totalEligible} eligible ({data?.turnoutPercentage}% turnout)
+          </p>
         </div>
 
         {data?.status === 'ACTIVE' && (
@@ -96,20 +98,44 @@ function ElectionResultsContent() {
         </div>
       )}
 
+      {/* Winner Spotlight Banner */}
+      {data?.winner && (
+        <div className="bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-gray-800 border border-indigo-500/40 p-6 rounded-xl flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 text-amber-400">
+              <Trophy className="w-8 h-8" />
+            </div>
+            <div>
+              <p className="text-xs uppercase font-semibold text-indigo-300 tracking-wider">Current Projected Winner</p>
+              <h2 className="text-xl font-extrabold text-white mt-0.5">{data.winner.name}</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Leading with <span className="text-indigo-400 font-bold">{data.winner.voteCount}</span> votes</p>
+            </div>
+          </div>
+          <span className="text-xs font-mono bg-indigo-500/20 text-indigo-300 px-3 py-1.5 rounded-lg border border-indigo-500/30">
+            {data?.status === 'CLOSED' ? 'Final Results' : 'Live Tally'}
+          </span>
+        </div>
+      )}
+
       {/* Candidate Results Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {data?.results.map((candidate: any) => (
-          <div key={candidate.candidateId} className="bg-gray-800 border border-gray-700/60 p-6 rounded-xl relative overflow-hidden">
+          <div key={candidate.candidateId} className="bg-gray-800 border border-gray-700/60 p-6 rounded-xl relative overflow-hidden flex flex-col justify-between">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <p className="text-sm font-medium text-gray-400">Candidate</p>
+                <p className="text-xs font-medium text-gray-400 uppercase">Candidate</p>
                 <h3 className="text-lg font-bold mt-1">{candidate.name}</h3>
               </div>
               <div className="bg-indigo-500/10 p-2.5 rounded-lg text-indigo-400">
                 <Award className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-3xl font-extrabold text-indigo-400">{candidate.voteCount} <span className="text-xs font-normal text-gray-400">votes</span></p>
+            <div className="mt-4 pt-4 border-t border-gray-700/60 flex items-baseline justify-between">
+              <span className="text-3xl font-extrabold text-indigo-400">{candidate.voteCount}</span>
+              <span className="text-xs font-medium text-gray-400">
+                {data?.totalVotes > 0 ? ((candidate.voteCount / data.totalVotes) * 100).toFixed(1) : '0'}% of votes
+              </span>
+            </div>
           </div>
         ))}
       </div>
@@ -121,20 +147,20 @@ function ElectionResultsContent() {
             <ShieldCheck className="w-5 h-5 text-indigo-400" />
             <span>Verified Anonymous Ballot Audit Log</span>
           </h2>
-          <span className="text-xs text-gray-400">Ensures secret ballot integrity</span>
+          <span className="text-xs text-gray-400">Cryptographically decoupled from voter IDs</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-900/50 text-gray-400 uppercase text-xs">
               <tr>
-                <th className="px-6 py-3">Ballot #</th>
+                <th className="px-6 py-3">Receipt / Ballot #</th>
                 <th className="px-6 py-3">Selected Candidate</th>
                 <th className="px-6 py-3">Timestamp</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {ballots.map((b: any) => (
-                <tr key={b.ballotNo} className="hover:bg-gray-700/20">
+              {ballots.map((b: any, idx: number) => (
+                <tr key={idx} className="hover:bg-gray-700/20">
                   <td className="px-6 py-4 font-mono text-indigo-300">#{b.ballotNo}</td>
                   <td className="px-6 py-4 font-medium">{b.candidateName}</td>
                   <td className="px-6 py-4 text-gray-400 flex items-center space-x-2">
@@ -145,7 +171,7 @@ function ElectionResultsContent() {
               ))}
               {ballots.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={3} className="px-6 py-12 text-center text-gray-500 italic">
                     No ballots recorded yet for this election.
                   </td>
                 </tr>
