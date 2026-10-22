@@ -3,8 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Users, Plus, CheckCircle, AlertCircle, Fingerprint, Calendar, X } from 'lucide-react';
-import api from '@/lib/api';
-
+import api from '@/app/lib/api';
 export default function VotersListPage() {
   const [voters, setVoters] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
