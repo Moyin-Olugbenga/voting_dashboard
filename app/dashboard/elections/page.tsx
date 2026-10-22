@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Vote, Plus, ArrowRight, CheckCircle, AlertCircle, Calendar, X } from 'lucide-react';
+import { Vote, Plus, ArrowRight, CheckCircle, AlertCircle, Calendar, X, Play, Lock } from 'lucide-react';
 import api from '@/app/lib/api';
 
 export default function ElectionsListPage() {
@@ -20,9 +20,15 @@ export default function ElectionsListPage() {
   const fetchElections = async () => {
     try {
       const res = await api.get('/elections');
-      // If you store elections in your overview or a dedicated /elections endpoint, map them here:
-      if (res.data && res.data.elections) {
-        setElections(res.data.elections);
+      const data = res.data;
+      if (Array.isArray(data)) {
+        setElections(data);
+      } else if (data && Array.isArray(data.elections)) {
+        setElections(data.elections);
+      } else if (data && Array.isArray(data.election)) {
+        setElections(data.election);
+      } else {
+        setElections([]);
       }
     } catch (err) {
       console.error('Failed to load elections', err);
@@ -42,6 +48,10 @@ export default function ElectionsListPage() {
     }
   };
 
+  const handleRemoveCandidate = (indexToRemove: number) => {
+    setCandidates(candidates.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const handleCreateElection = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
@@ -50,7 +60,7 @@ export default function ElectionsListPage() {
     try {
       const formattedCandidates = candidates.map((c) => ({ name: c }));
       const res = await api.post('/elections', { title, candidates: formattedCandidates });
-      if (res.data.success) {
+      if (res.data.success || res.status === 201) {
         setMessage('Election created successfully in DRAFT state!');
         setTitle('');
         setCandidates([]);
@@ -59,6 +69,20 @@ export default function ElectionsListPage() {
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create election.');
+    }
+  };
+
+  const handleUpdateStatus = async (electionId: string, newStatus: 'ACTIVE' | 'CLOSED') => {
+    setMessage('');
+    setError('');
+    try {
+      const res = await api.patch(`/elections/${electionId}/status`, { status: newStatus });
+      if (res.data.success) {
+        setMessage(`Election status successfully updated to ${newStatus}!`);
+        fetchElections();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || `Failed to update status to ${newStatus}. Make sure candidates and eligible voters are assigned.`);
     }
   };
 
@@ -96,7 +120,7 @@ export default function ElectionsListPage() {
       {/* Modal for Creating Election */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 border border-gray-700 w-full max-w-lg rounded-xl p-6 relative space-y-6">
+          <div className="bg-gray-800 border border-gray-700 w-full max-w-lg rounded-xl p-6 relative space-y-6 shadow-xl">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white"
@@ -139,8 +163,11 @@ export default function ElectionsListPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {candidates.map((c, idx) => (
-                    <span key={idx} className="bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full text-xs flex items-center space-x-1">
+                    <span key={idx} className="bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full text-xs flex items-center space-x-2">
                       <span>{c}</span>
+                      <button type="button" onClick={() => handleRemoveCandidate(idx)} className="hover:text-red-400">
+                        &times;
+                      </button>
                     </span>
                   ))}
                 </div>
@@ -175,10 +202,18 @@ export default function ElectionsListPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {elections.map((election) => (
-              <div key={election.id} className="bg-gray-800 border border-gray-700/60 p-6 rounded-xl flex flex-col justify-between space-y-4">
+              <div key={election.id} className="bg-gray-800 border border-gray-700/60 p-6 rounded-xl flex flex-col justify-between space-y-6">
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="bg-indigo-500/10 text-indigo-400 text-xs px-2.5 py-1 rounded-full font-medium uppercase">
+                    <span
+                      className={`text-xs px-2.5 py-1 rounded-full font-semibold uppercase ${
+                        election.status === 'ACTIVE'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          : election.status === 'CLOSED'
+                          ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30'
+                      }`}
+                    >
                       {election.status}
                     </span>
                     <span className="text-xs text-gray-400 flex items-center space-x-1">
@@ -186,17 +221,43 @@ export default function ElectionsListPage() {
                       <span>{new Date(election.createdAt).toLocaleDateString()}</span>
                     </span>
                   </div>
-                  <h3 className="text-lg font-bold">{election.title}</h3>
-                  <p className="text-sm text-gray-400 mt-1">Click below to inspect candidate tallies and verifiable ballot logs.</p>
+                  <h3 className="text-lg font-bold mt-1">{election.title}</h3>
+                  <p className="text-sm text-gray-400 mt-1">Manage state lifecycle, verify eligibility lists, and inspect real-time ballot tallies.</p>
                 </div>
 
-                <button
-                  onClick={() => router.push(`/dashboard/elections/${election.id}/results`)}
-                  className="flex items-center justify-between bg-gray-900 hover:bg-gray-700/50 border border-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-indigo-400"
-                >
-                  <span>View Results & Ballots</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                <div className="space-y-3 pt-4 border-t border-gray-700/60">
+                  {/* Status Action Buttons */}
+                  <div className="flex items-center space-x-2">
+                    {election.status === 'DRAFT' && (
+                      <button
+                        onClick={() => handleUpdateStatus(election.id, 'ACTIVE')}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-xs py-2 rounded-lg font-medium transition-colors flex items-center justify-center space-x-1.5 text-white"
+                      >
+                        <Play className="w-3.5 h-3.5" />
+                        <span>Launch Active</span>
+                      </button>
+                    )}
+
+                    {election.status === 'ACTIVE' && (
+                      <button
+                        onClick={() => handleUpdateStatus(election.id, 'CLOSED')}
+                        className="flex-1 bg-red-600 hover:bg-red-500 text-xs py-2 rounded-lg font-medium transition-colors flex items-center justify-center space-x-1.5 text-white"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Close Polls</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Navigation to Results / Analytics */}
+                  <button
+                    onClick={() => router.push(`/dashboard/elections/${election.id}/results`)}
+                    className="flex items-center justify-between bg-gray-900 hover:bg-gray-700/50 border border-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-indigo-400"
+                  >
+                    <span>View Results & Audit Logs</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
             {elections.length === 0 && (
